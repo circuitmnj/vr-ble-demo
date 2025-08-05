@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>VR BLE Demo</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+</head>
+<body>
+  <button id="connectBtn" style="position:absolute;z-index:999;padding:10px;">Connect BLE</button>
+  
+  <a-scene>
+    <!-- Camera + Cursor -->
+    <a-entity camera look-controls wasd-controls>
+      <a-entity cursor="fuse: false; rayOrigin: mouse;" position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: black; shader: flat"></a-entity>
+    </a-entity>
+    
+    <!-- 3D Box controlled by BLE -->
+    <a-box id="vrBox" position="0 1.5 -3" rotation="0 0 0" color="#4CC3D9"></a-box>
+    <a-sky color="#ECECEC"></a-sky>
+  </a-scene>
+
+  <script>
+    let boxEl = document.querySelector('#vrBox');
+
+    document.querySelector('#connectBtn').addEventListener('click', async () => {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'VR_Controller' }],
+          optionalServices: ['180C']
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('180C');
+        const characteristic = await service.getCharacteristic('2A56');
+
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', (event) => {
+          let value = new TextDecoder().decode(event.target.value);
+          let [gx, gy, gz] = value.split(',').map(parseFloat);
+
+          // Map gyro data to box rotation
+          boxEl.setAttribute('rotation', `${gx} ${gy} ${gz}`);
+        });
+
+        console.log("BLE Connected!");
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>
