@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>VR BLE Demo</title>
+  <title>VR BLE Demo (Fixed UUID)</title>
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 </head>
 <body>
@@ -23,6 +23,9 @@
   </a-scene>
 
   <script>
+    const serviceUUID = '0000180c-0000-1000-8000-00805f9b34fb';
+    const charUUID = '00002a56-0000-1000-8000-00805f9b34fb';
+
     let boxEl = document.querySelector('#vrBox');
     let debugText = document.querySelector('#debugText');
     let statusDiv = document.querySelector('#status');
@@ -40,35 +43,38 @@
 
     document.querySelector('#connectBtn').addEventListener('click', async () => {
       try {
-        statusDiv.textContent = "Status: Connecting...";
+        statusDiv.textContent = "Status: Requesting Device...";
         const device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: ['180C']
+          optionalServices: [serviceUUID]
         });
+        console.log("Device selected:", device);
+
+        statusDiv.textContent = "Status: Connecting to GATT...";
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('180C');
-        const characteristic = await service.getCharacteristic('2A56');
+
+        const service = await server.getPrimaryService(serviceUUID);
+        console.log("Service found");
+
+        const characteristic = await service.getCharacteristic(charUUID);
+        console.log("Characteristic found");
 
         characteristic.startNotifications();
         characteristic.addEventListener('characteristicvaluechanged', (event) => {
           let value = new TextDecoder().decode(event.target.value);
-          let [gx, gy, gz, btn] = value.split(',').map(v => parseFloat(v) || 0);
+          console.log("Received data:", value);
 
+          let [gx, gy, gz, btn] = value.split(',').map(v => parseFloat(v) || 0);
           let smooth = smoothRotation(gx, gy, gz);
           boxEl.setAttribute('rotation', `${smooth.x} ${smooth.y} ${smooth.z}`);
 
-          if (btn === 1) {
-            boxEl.setAttribute('color', '#FF0000'); // Red when button pressed
-          } else {
-            boxEl.setAttribute('color', '#4CC3D9'); // Default color
-          }
+          boxEl.setAttribute('color', btn === 1 ? '#FF0000' : '#4CC3D9');
 
           debugText.setAttribute('text', `value: gx:${gx.toFixed(2)} gy:${gy.toFixed(2)} gz:${gz.toFixed(2)} btn:${btn}`);
           debugDiv.textContent = `Data: gx:${gx.toFixed(2)} gy:${gy.toFixed(2)} gz:${gz.toFixed(2)} btn:${btn}`;
         });
 
-        statusDiv.textContent = "Status: Connected!";
-        console.log("BLE Connected!");
+        statusDiv.textContent = "Status: Connected and Listening!";
       } catch (error) {
         statusDiv.textContent = "Status: Error (check console)";
         console.error("BLE Error: ", error);
