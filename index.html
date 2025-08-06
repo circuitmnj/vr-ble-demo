@@ -3,32 +3,46 @@
 <head>
   <meta charset="utf-8">
   <title>VR BLE Demo</title>
-  <!-- Use A-Frame 1.2.0 for Cardboard split-screen -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 </head>
 <body>
   <button id="connectBtn" style="position:absolute;z-index:999;padding:10px;">Connect BLE</button>
-  
+  <div id="status" style="position:absolute;top:50px;z-index:999;color:black;background:white;padding:5px;">Status: Not Connected</div>
+  <div id="debug" style="position:absolute;top:90px;z-index:999;color:black;background:white;padding:5px;">Data: --</div>
+
   <a-scene vr-mode-ui="enabled: true;">
-    <!-- Camera and Cursor -->
     <a-entity camera look-controls wasd-controls>
       <a-entity cursor="fuse: false; rayOrigin: mouse;" position="0 0 -1"
                 geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
                 material="color: black; shader: flat"></a-entity>
     </a-entity>
-    
-    <!-- Object controlled via BLE -->
+
     <a-box id="vrBox" position="0 1.5 -3" rotation="0 0 0" color="#4CC3D9"></a-box>
+    <a-entity id="debugText" position="0 2 -3" text="value: Waiting for data; color: black; align: center"></a-entity>
     <a-sky color="#ECECEC"></a-sky>
   </a-scene>
 
   <script>
     let boxEl = document.querySelector('#vrBox');
+    let debugText = document.querySelector('#debugText');
+    let statusDiv = document.querySelector('#status');
+    let debugDiv = document.querySelector('#debug');
+
+    // Simple smoothing filter
+    let lastRotation = {x:0, y:0, z:0};
+    function smoothRotation(gx, gy, gz) {
+      const alpha = 0.2;
+      lastRotation.x = lastRotation.x + alpha * (gx - lastRotation.x);
+      lastRotation.y = lastRotation.y + alpha * (gy - lastRotation.y);
+      lastRotation.z = lastRotation.z + alpha * (gz - lastRotation.z);
+      return lastRotation;
+    }
 
     document.querySelector('#connectBtn').addEventListener('click', async () => {
       try {
+        statusDiv.textContent = "Status: Connecting...";
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: 'VR_Controller' }],
+          acceptAllDevices: true,
           optionalServices: ['180C']
         });
         const server = await device.gatt.connect();
@@ -38,13 +52,26 @@
         characteristic.startNotifications();
         characteristic.addEventListener('characteristicvaluechanged', (event) => {
           let value = new TextDecoder().decode(event.target.value);
-          let [gx, gy, gz] = value.split(',').map(parseFloat);
-          boxEl.setAttribute('rotation', `${gx} ${gy} ${gz}`);
+          let [gx, gy, gz, btn] = value.split(',').map(v => parseFloat(v) || 0);
+
+          let smooth = smoothRotation(gx, gy, gz);
+          boxEl.setAttribute('rotation', `${smooth.x} ${smooth.y} ${smooth.z}`);
+
+          if (btn === 1) {
+            boxEl.setAttribute('color', '#FF0000'); // Red when button pressed
+          } else {
+            boxEl.setAttribute('color', '#4CC3D9'); // Default color
+          }
+
+          debugText.setAttribute('text', `value: gx:${gx.toFixed(2)} gy:${gy.toFixed(2)} gz:${gz.toFixed(2)} btn:${btn}`);
+          debugDiv.textContent = `Data: gx:${gx.toFixed(2)} gy:${gy.toFixed(2)} gz:${gz.toFixed(2)} btn:${btn}`;
         });
 
+        statusDiv.textContent = "Status: Connected!";
         console.log("BLE Connected!");
       } catch (error) {
-        console.error(error);
+        statusDiv.textContent = "Status: Error (check console)";
+        console.error("BLE Error: ", error);
       }
     });
   </script>
