@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8">
   <title>VR BLE Demo</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- Use A-Frame 1.2.0 for Cardboard split-screen -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 </head>
 <body>
   <button id="connectBtn" style="position:absolute;z-index:999;padding:10px;">Connect BLE</button>
   
-  <a-scene>
-    <!-- Camera + Cursor -->
+  <a-scene vr-mode-ui="enabled: true;">
+    <!-- Camera and Cursor -->
     <a-entity camera look-controls wasd-controls>
       <a-entity cursor="fuse: false; rayOrigin: mouse;" position="0 0 -1"
                 geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
                 material="color: black; shader: flat"></a-entity>
     </a-entity>
     
-    <!-- 3D Box controlled by BLE -->
+    <!-- Object controlled via BLE -->
     <a-box id="vrBox" position="0 1.5 -3" rotation="0 0 0" color="#4CC3D9"></a-box>
     <a-sky color="#ECECEC"></a-sky>
   </a-scene>
@@ -38,8 +39,6 @@
         characteristic.addEventListener('characteristicvaluechanged', (event) => {
           let value = new TextDecoder().decode(event.target.value);
           let [gx, gy, gz] = value.split(',').map(parseFloat);
-
-          // Map gyro data to box rotation
           boxEl.setAttribute('rotation', `${gx} ${gy} ${gz}`);
         });
 
